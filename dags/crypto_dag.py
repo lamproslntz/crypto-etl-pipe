@@ -1,10 +1,51 @@
+from typing import Optional
+
 import pendulum
-import requests
 from airflow.decorators import dag, task
+from decouple import config
 
-from include.global_variables import airflow_config, polygon_config
+from include.configs import airflow_config
+from include.crypto.crypto_extract import crypto_extract
+from include.crypto.crypto_transform import crypto_transform
 
-airflow_logger = airflow_config.task_log
+logger = airflow_config.task_log
+
+
+@task
+def extract_task(polygon_api_key: str) -> Optional[dict]:
+    """Task for extracting open and close prices of a crypto symbol on a certain day using Crypto Polygon API.
+
+    Args:
+        polygon_api_key:
+            Polygon API key.
+
+    Returns:
+        Open and close prices of a crypto symbol on a certain day, otherwise None.
+        See Crypto Polygon API documentation [here](https://polygon.io/docs/crypto/getting-started).
+    """
+    return crypto_extract(polygon_api_key)
+
+
+@task
+def transform_task(response: Optional[dict]) -> Optional[dict]:
+    """Task for transformating Crypto Polygon API data.
+
+    Args:
+        response:
+            Crypto Polygon API response.
+
+    Returns:
+        Tranformed Crypto Polygon API data, otherwise None.
+
+        {
+            'crypto_symbol': 'BTC',
+            'crypto_currency': 'USD',
+            'date_capture': "2023-01-01",
+            'price_open': 16532,
+            'price_close': 16611.58,
+        }
+    """
+    return crypto_transform(response)
 
 
 @dag(
@@ -17,54 +58,10 @@ airflow_logger = airflow_config.task_log
     tags=["start", "setup"],
 )
 def crypto_pipeline():
-    """TODO: complete"""
-
-    @task
-    def extract_task():
-        """TODO: complete"""
-        # load Polygon API configurations
-        api_key = polygon_config.default_args["api_key"]
-        base_url = polygon_config.default_args["base_url"]
-        symbol_from = polygon_config.default_args["symbol_from"]
-        symbol_to = polygon_config.default_args["symbol_to"]
-        date_capture = polygon_config.default_args["date_capture"]
-        price_adjusted = polygon_config.default_args["price_adjusted"]
-
-        data = dict()
-        try:
-            response = requests.get(
-                f"{base_url}/{symbol_from}/{symbol_to}/{date_capture}?adjusted={price_adjusted}&apiKey={api_key}"
-            )
-            response.raise_for_status()
-
-            data = response.json()
-        except requests.exceptions.HTTPError:
-            airflow_logger.error(response.json()["error"])
-
-        return data
-
-    @task
-    def transform_task(data):
-        """TODO: complete"""
-        symbol, currency = data["symbol"].split("-")
-
-        date_capture = pendulum.parse(data["day"])
-        date_capture = date_capture.to_date_string()
-
-        # default values
-        crypto_info = {
-            "symbol": symbol,
-            "currency": currency,
-            "day": date_capture,
-            "open_price": data["open"],
-            "close_price": data["close"],
-        }
-
-        return crypto_info
-
-    transform_task(extract_task())
-    # transformed_data = transform_task(extract_task())
-    # extract_task() >> transform_task()
+    """ETL pipeline for crypto data from Crypto Polygon API."""
+    raw_data = extract_task(polygon_api_key=config("POLYGON_API_KEY"))
+    transform_task(response=raw_data)
+    # transformed_data = transform_task(raw_data)
 
 
 crypto_pipeline()
