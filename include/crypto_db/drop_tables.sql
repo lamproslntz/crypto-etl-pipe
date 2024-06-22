@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS crypto_prices, crypto_symbols;

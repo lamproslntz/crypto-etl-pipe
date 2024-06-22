@@ -2,11 +2,14 @@ from typing import Optional
 
 import pendulum
 from airflow.decorators import dag, task
+from airflow.models.baseoperator import chain
+from airflow.operators.empty import EmptyOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from decouple import config
 
 from include.configs import airflow_config
-from include.crypto.crypto_extract import crypto_extract
-from include.crypto.crypto_transform import crypto_transform
+from include.crypto_etl.crypto_extract import crypto_extract
+from include.crypto_etl.crypto_transform import crypto_transform
 
 logger = airflow_config.task_log
 
@@ -39,7 +42,7 @@ def transform_task(response: Optional[dict]) -> Optional[dict]:
 
         {
             'crypto_symbol': 'BTC',
-            'crypto_currency': 'USD',
+            'price_currency': 'USD',
             'date_capture': "2023-01-01",
             'price_open': 16532,
             'price_close': 16611.58,
@@ -53,15 +56,41 @@ def transform_task(response: Optional[dict]) -> Optional[dict]:
     default_args=airflow_config.default_args,
     start_date=pendulum.datetime(2020, 1, 1),
     schedule="@daily",
+    template_searchpath="/usr/local/airflow/include/crypto_db/",
     catchup=False,
     description="ETL Pipeline for Crypto Data from Polygon",
     tags=["start", "setup"],
 )
 def crypto_pipeline():
     """ETL pipeline for crypto data from Crypto Polygon API."""
+    drop_tables = SQLExecuteQueryOperator(
+        task_id="drop_tables",
+        conn_id="crypto_etl_pipe",
+        sql="drop_tables.sql",
+    )
+    create_crypto_symbols_table = SQLExecuteQueryOperator(
+        task_id="create_crypto_symbols_table",
+        conn_id="crypto_etl_pipe",
+        sql="create_crypto_symbols.sql",
+    )
+    create_crypto_prices_table = SQLExecuteQueryOperator(
+        task_id="create_crypto_prices_table",
+        conn_id="crypto_etl_pipe",
+        sql="create_crypto_prices.sql",
+    )
+
     raw_data = extract_task(polygon_api_key=config("POLYGON_API_KEY"))
-    transform_task(response=raw_data)
-    # transformed_data = transform_task(raw_data)
+    transformed_data = transform_task(response=raw_data)
+
+    chain(
+        EmptyOperator(task_id="begin"),
+        drop_tables,
+        create_crypto_symbols_table,
+        create_crypto_prices_table,
+        raw_data,
+        transformed_data,
+        EmptyOperator(task_id="end"),
+    )
 
 
 crypto_pipeline()

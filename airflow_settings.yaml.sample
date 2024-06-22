@@ -8,6 +8,7 @@ airflow:
       conn_password:
       conn_port:
       conn_extra:
+        example_extra_field:
   pools:
     - pool_name:
       pool_slot:

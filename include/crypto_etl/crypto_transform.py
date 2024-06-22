@@ -13,8 +13,8 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
             - close
         - transforms to dict with the following keys
             - crypto_symbol
-            - crypto_currency
             - date_capture
+            - price_currency
             - price_open
             - price_close
 
@@ -27,7 +27,7 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
 
         {
             'crypto_symbol': 'BTC',
-            'crypto_currency': 'USD',
+            'price_currency': 'USD',
             'date_capture': "2023-01-01",
             'price_open': 16532,
             'price_close': 16611.58,
@@ -37,7 +37,7 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
         return None
     
     # Polygon API: "symbol": "BTC-USD"
-    crypto_symbol, crypto_currency = response["symbol"].split("-")
+    crypto_symbol, price_currency = response["symbol"].split("-")
     # Polygon API: "day": "2023-01-01T00:00:00Z"
     date_capture = pendulum.parse(response["day"]).to_date_string()
     # Polygon API: "open": 16532
@@ -47,7 +47,7 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
 
     return {
         "crypto_symbol": crypto_symbol,
-        "crypto_currency": crypto_currency,
+        "price_currency": price_currency,
         "date_capture": date_capture,
         "price_open": price_open,
         "price_close": price_close,
