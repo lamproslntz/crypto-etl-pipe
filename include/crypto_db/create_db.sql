@@ -1,3 +1,0 @@
-CREATE DATABASE crypto
-    WITH
-    ENCODING = 'UTF8';

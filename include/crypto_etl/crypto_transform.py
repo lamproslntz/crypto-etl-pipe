@@ -1,4 +1,5 @@
 from typing import Optional
+
 import pendulum
 
 
@@ -21,7 +22,7 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
     Args:
         response:
             Crypto Polygon API response.
-        
+
     Returns:
         Tranformed Crypto Polygon API data, otherwise None.
 
@@ -35,7 +36,7 @@ def crypto_transform(response: Optional[dict]) -> Optional[dict]:
     """
     if response is None:
         return None
-    
+
     # Polygon API: "symbol": "BTC-USD"
     crypto_symbol, price_currency = response["symbol"].split("-")
     # Polygon API: "day": "2023-01-01T00:00:00Z"

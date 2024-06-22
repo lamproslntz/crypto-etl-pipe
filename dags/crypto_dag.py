@@ -82,6 +82,19 @@ def crypto_pipeline():
     raw_data = extract_task(polygon_api_key=config("POLYGON_API_KEY"))
     transformed_data = transform_task(response=raw_data)
 
+    insert_crypto_prices = SQLExecuteQueryOperator(
+        task_id="insert_crypto_prices",
+        conn_id="crypto_etl_pipe",
+        sql="insert_crypto_prices.sql",
+        parameters={
+            "crypto_symbol": "BTC",
+            "capture_date": "2023-01-01",
+            "price_currency": "USD",
+            "price_open": 16532,
+            "price_close": 16611.58,
+        },  # TODO
+    )
+
     chain(
         EmptyOperator(task_id="begin"),
         drop_tables,
@@ -89,6 +102,7 @@ def crypto_pipeline():
         create_crypto_prices_table,
         raw_data,
         transformed_data,
+        insert_crypto_prices,
         EmptyOperator(task_id="end"),
     )
 

@@ -1,19 +1,19 @@
-from typing import Optional
 import logging
-import requests
+from typing import Optional
 
+import requests
 
 logger = logging.getLogger(__package__)
 
 
 def crypto_extract(polygon_api_key: str) -> Optional[dict]:
     """Extracts open and close prices of a crypto symbol on a certain day using Crypto Polygon API.
-    
+
     Args:
         polygon_api_key:
             Polygon API key.
-    
-    Returns: 
+
+    Returns:
         Open and close prices of a crypto symbol on a certain day, otherwise None.
         See Crypto Polygon API documentation [here](https://polygon.io/docs/crypto/getting-started).
     """
