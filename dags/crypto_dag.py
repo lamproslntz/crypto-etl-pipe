@@ -1,36 +1,20 @@
-from typing import List, Optional
+import logging
+from typing import Optional
 
 import pendulum
 from airflow.decorators import dag, task
-from airflow.models.baseoperator import chain
 from airflow.operators.empty import EmptyOperator
 from decouple import config
 
-from include.configs import airflow_config
 from include.crypto_db.create_table import create_crypto_prices_table
-from include.crypto_db.drop_table import drop_table
 from include.crypto_etl.crypto_extract import crypto_extract
 from include.crypto_etl.crypto_load import crypto_load
 from include.crypto_etl.crypto_transform import crypto_transform
 
-logger = airflow_config.task_log
+logger = logging.getLogger("airflow.task")
 
 
-@task
-def reset_task(postgres_conn_id: str, tables: List[str]) -> None:
-    """Task for reseting postgres tables.
-
-    Args:
-        postgres_conn_id:
-            The postgres conn id reference to a specific postgres database.
-        tables:
-            List of postgres tables.
-    """
-    for table in tables:
-        drop_table(postgres_conn_id=postgres_conn_id, table=table)
-
-
-@task
+@task(task_id="setup_db_tables")
 def setup_task(postgres_conn_id: str) -> None:
     """Task for setting up the database schema (tables, sequences, etc.).
 
@@ -41,8 +25,8 @@ def setup_task(postgres_conn_id: str) -> None:
     create_crypto_prices_table(postgres_conn_id=postgres_conn_id)
 
 
-@task
-def extract_task(polygon_api_key: str) -> Optional[dict]:
+@task(task_id="extract")
+def extract_task(polygon_api_key: str, **context) -> Optional[dict]:
     """Task for extracting open and close prices of a crypto symbol on a certain day using Crypto Polygon API.
 
     Args:
@@ -53,10 +37,17 @@ def extract_task(polygon_api_key: str) -> Optional[dict]:
         Open and close prices of a crypto symbol on a certain day, otherwise None.
         See Crypto Polygon API documentation [here](https://polygon.io/docs/crypto/getting-started).
     """
-    return crypto_extract(polygon_api_key)
+    capture_date = context["ds"]
+    response = crypto_extract(polygon_api_key, capture_date=capture_date)
+
+    # if Polygon API failed then retry
+    if response is None:
+        raise Exception(f"Polygon request for {capture_date} failed. Retrying ...")
+
+    return response
 
 
-@task
+@task(task_id="transform")
 def transform_task(response: Optional[dict]) -> Optional[dict]:
     """Task for transformating Crypto Polygon API data.
 
@@ -78,7 +69,7 @@ def transform_task(response: Optional[dict]) -> Optional[dict]:
     return crypto_transform(response)
 
 
-@task
+@task(task_id="load")
 def load_task(postgres_conn_id: str, records: Optional[dict]) -> None:
     """Task for uploading transformed data from Crypto Polygon API.
 
@@ -93,36 +84,32 @@ def load_task(postgres_conn_id: str, records: Optional[dict]) -> None:
 
 @dag(
     dag_id="crypto_etl_pipe",
-    default_args=airflow_config.default_args,
-    start_date=pendulum.datetime(2020, 1, 1),
+    start_date=pendulum.datetime(2024, 6, 1),
     schedule="@daily",
-    catchup=False,
-    description="ETL Pipeline for Crypto Data from Polygon",
+    catchup=True,
+    default_args={
+        "retries": 5,
+        "retry_delay": pendulum.duration(minutes=1),
+        "depends_on_past": False,
+    },
+    description="ETL pipeline for crypto data from Polygon",
     tags=["polygon", "crypto"],
 )
 def crypto_pipeline():
     """ETL pipeline for crypto data from Crypto Polygon API."""
-    chain(
-        EmptyOperator(
-            task_id="begin",
-        ),
-        reset_task(
-            postgres_conn_id="crypto_etl_pipe",
-            tables=["crypto_prices"],
-        ),
-        setup_task(
-            postgres_conn_id="crypto_etl_pipe",
-        ),
-        load_task(
-            postgres_conn_id="crypto_etl_pipe",
-            records=transform_task(
-                response=extract_task(polygon_api_key=config("POLYGON_API_KEY")),
-            ),
-        ),
-        EmptyOperator(
-            task_id="end",
-        ),
+    begin_task = EmptyOperator(task_id="begin")
+    end_task = EmptyOperator(task_id="end")
+
+    setup_db_tables = setup_task(postgres_conn_id="crypto_etl_pipe")
+
+    raw_data = extract_task(polygon_api_key=config("POLYGON_API_KEY"))
+    transformed_data = transform_task(response=raw_data)
+    loaded_data = load_task(
+        postgres_conn_id="crypto_etl_pipe", records=transformed_data
     )
+
+    begin_task >> setup_db_tables >> loaded_data
+    begin_task >> raw_data >> transformed_data >> loaded_data >> end_task
 
 
 crypto_pipeline()

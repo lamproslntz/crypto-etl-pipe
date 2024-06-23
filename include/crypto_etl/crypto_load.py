@@ -34,6 +34,7 @@ def crypto_load(postgres_conn_id: str, records: Optional[dict]) -> None:
                                 '{records["price_currency"]}',
                                 {records["price_open"]},
                                 {records["price_close"]}
-                            );
+                            )
+                        ON CONFLICT DO NOTHING;
                 """
             )

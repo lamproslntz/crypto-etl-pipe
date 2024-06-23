@@ -1,13 +1,13 @@
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 import logging
 
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 logger = logging.getLogger(__package__)
 
 
 def create_crypto_prices_table(postgres_conn_id: str) -> None:
     """Created crypto_prices postgres table.
-    
+
     Args:
         postgres_conn_id:
             The postgres conn id reference to a specific postgres database.
@@ -16,7 +16,7 @@ def create_crypto_prices_table(postgres_conn_id: str) -> None:
         with PostgresHook(postgres_conn_id).get_conn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    f"""
+                    """
                         CREATE TABLE IF NOT EXISTS crypto_prices
                         (
                             crypto_symbol character varying(255) NOT NULL,
@@ -28,5 +28,5 @@ def create_crypto_prices_table(postgres_conn_id: str) -> None:
                         );
                     """
                 )
-    except Exception as e:
+    except Exception:
         logger.exception("Could not create crypto_prices table.")
