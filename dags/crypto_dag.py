@@ -4,6 +4,7 @@ from typing import Optional
 import pendulum
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
+from dags_settings import dags_settings
 from decouple import config
 
 from include.crypto_db.create_table import create_crypto_prices_table
@@ -12,6 +13,11 @@ from include.crypto_etl.crypto_load import crypto_load
 from include.crypto_etl.crypto_transform import crypto_transform
 
 logger = logging.getLogger("airflow.task")
+
+
+CRYPTOCURRENCIES = dags_settings["crypto"]["cryptos"]
+START_DATE = dags_settings["crypto"]["start_date"]
+RETRIES = dags_settings["crypto"]["retries"]
 
 
 @task(task_id="setup_db_tables")
@@ -26,10 +32,12 @@ def setup_task(postgres_conn_id: str) -> None:
 
 
 @task(task_id="extract")
-def extract_task(polygon_api_key: str, **context) -> Optional[dict]:
+def extract_task(crypto_symbol: str, polygon_api_key: str, **context) -> Optional[dict]:
     """Task for extracting open and close prices of a crypto symbol on a certain day using Crypto Polygon API.
 
     Args:
+        crypto_symbol:
+            Crypto symbol (e.g. BTC, DOGE, etc.).
         polygon_api_key:
             Polygon API key.
 
@@ -38,7 +46,11 @@ def extract_task(polygon_api_key: str, **context) -> Optional[dict]:
         See Crypto Polygon API documentation [here](https://polygon.io/docs/crypto/getting-started).
     """
     capture_date = context["ds"]
-    response = crypto_extract(polygon_api_key, capture_date=capture_date)
+    response = crypto_extract(
+        crypto_symbol=crypto_symbol,
+        capture_date=capture_date,
+        polygon_api_key=polygon_api_key,
+    )
 
     # if Polygon API failed then retry
     if response is None:
@@ -82,34 +94,50 @@ def load_task(postgres_conn_id: str, records: Optional[dict]) -> None:
     crypto_load(postgres_conn_id, records)
 
 
-@dag(
-    dag_id="crypto_etl_pipe",
-    start_date=pendulum.datetime(2024, 6, 1),
-    schedule="@daily",
-    catchup=True,
-    default_args={
-        "retries": 5,
-        "retry_delay": pendulum.duration(minutes=1),
-        "depends_on_past": False,
-    },
-    description="ETL pipeline for crypto data from Polygon",
-    tags=["polygon", "crypto"],
-)
-def crypto_pipeline():
-    """ETL pipeline for crypto data from Crypto Polygon API."""
-    begin_task = EmptyOperator(task_id="begin")
-    end_task = EmptyOperator(task_id="end")
+def create_dag(dag_id: str, crypto_symbol: str):
+    """Creates Aiflow DAGs representing ETL pipelines for crypto data from Crypto Polygon API.
 
-    setup_db_tables = setup_task(postgres_conn_id="crypto_etl_pipe")
+    Args:
+        dag_id:
+            Aiflow DAG identifier.
+        crypto_symbol:
+            Crypto symbol (e.g. BTC, DOGE, etc.).
+    """
 
-    raw_data = extract_task(polygon_api_key=config("POLYGON_API_KEY"))
-    transformed_data = transform_task(response=raw_data)
-    loaded_data = load_task(
-        postgres_conn_id="crypto_etl_pipe", records=transformed_data
+    @dag(
+        dag_id=dag_id,
+        start_date=pendulum.parse(START_DATE),
+        schedule="@daily",
+        catchup=True,
+        default_args={
+            "retries": 80,
+            "retry_delay": pendulum.duration(minutes=1),
+            "depends_on_past": False,
+        },
+        tags=["polygon", "crypto"],
     )
+    def crypto_pipeline():
+        """ETL pipeline for crypto data from Crypto Polygon API."""
+        begin_task = EmptyOperator(task_id="begin")
+        end_task = EmptyOperator(task_id="end")
 
-    begin_task >> setup_db_tables >> loaded_data
-    begin_task >> raw_data >> transformed_data >> loaded_data >> end_task
+        setup_db_tables = setup_task(postgres_conn_id="crypto_etl_pipe")
+
+        raw_data = extract_task(
+            crypto_symbol=crypto_symbol, polygon_api_key=config("POLYGON_API_KEY")
+        )
+        transformed_data = transform_task(response=raw_data)
+        loaded_data = load_task(
+            postgres_conn_id="crypto_etl_pipe", records=transformed_data
+        )
+
+        begin_task >> setup_db_tables >> loaded_data
+        begin_task >> raw_data >> transformed_data >> loaded_data >> end_task
+
+    return crypto_pipeline()
 
 
-crypto_pipeline()
+for crypto in CRYPTOCURRENCIES:
+    dag_id = f"{crypto.lower()}_etl_pipe"
+
+    globals()[dag_id] = create_dag(dag_id=dag_id, crypto_symbol=crypto)
