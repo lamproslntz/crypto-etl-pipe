@@ -1,9 +1,9 @@
 airflow:
   connections:
-    - conn_id:
-      conn_type:
-      conn_host:
-      conn_schema:
+    - conn_id: crypto_etl_pipe  # don't modify
+      conn_type: postgres  # don't modify
+      conn_host: # host.docker.internal for localhost
+      conn_schema: # PostgreSQL database name
       conn_login:
       conn_password:
       conn_port:

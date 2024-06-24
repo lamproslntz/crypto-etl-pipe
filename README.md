@@ -1,42 +1,68 @@
-# data-engineer-test
+# Crypto ETL Pipeline
 
-## Introduction
+## About the Project
 
-We are excited that you are considering joining our team! To move forward in the selection process, we propose a challenge that reflects the real-world problems we face on a daily basis.
+TODO:
 
-### Challenge Description
+## Architecture
 
-The objective of this test is to develop a data ingestion pipeline using Python, which will:
+### ETL Pipeline
 
-* **Extract** data on the Gross Domestic Product (GDP) of South American countries using the World Bank API:
-  * Endpoint: `https://api.worldbank.org/v2/country/ARG;BOL;BRA;CHL;COL;ECU;GUY;PRY;PER;SUR;URY;VEN/indicator/NY.GDP.MKTP.CD?format=json&page=1&per_page=50`
+TODO:
 
-* **Load** this data into a SQL database of your choice (such as PostgreSQL, SQLite, DuckDB, Trino, etc.):
-  * Create `country` (id, name, iso3_code) and `gdp` (country_id, year, value) tables.
-  * Additional structures or control columns may be implemented as needed.
+### Database
 
-* **Query** the loaded data to produce a pivoted report of the last 5 years for each country, presented in Billions:
-  * Expected query structure:
+TODO:
 
-    | id | name     | iso3_code | 2019 | 2020 | 2021 | 2022 | 2023 |
-    |----|----------|-----------|------|------|------|------|------|
+## What You Need
 
-### Technical Requirements
+1. Docker and Docker Compose (see [here](https://www.docker.com/products/docker-desktop/)).
 
-* Implement the solution in a Docker environment, using Docker Compose to orchestrate the necessary services.
-* Use only pure Python or SQL for data manipulation, without frameworks or libraries based on dataframes (such as Pandas, Polars, etc.). Utility and database access libraries are allowed.
-* The use of Apache Airflow for process automation is optional, but will be considered a differential.
+2. Astro CLI to run Apache Airflow (see [here](https://www.astronomer.io/docs/astro/cli/install-cli)).
 
-### Submission
+3. PostgreSQL (see [here](https://www.postgresql.org/download/)).
 
-* Submit the code in a Git repository (e.g., GitHub, GitLab).
-* Include a `README.md` file with detailed instructions on how to execute the project.
-* Document assumptions and design decisions made during development.
+4. Polygon acount and API key (see [here](https://polygon.io/)).
 
-### Evaluation Criteria
+5. Clone the repository.
 
-* Reliability and efficiency of the script.
-* Clarity and organization of the code.
-* Strict adherence to the provided instructions and requirements.
+  ```bash
+  git clone https://github.com/lamproslntz/crypto-etl-pipe.git
+  ```
 
-We hope you find this challenge stimulating and informative. Should you have any questions or need further information, please do not hesitate to contact us.
+6. Change into the project directory.
+
+  ```bash
+  cd crypto-etl-pipe
+  ```
+
+7. Create a PostgreSQL database to host the data.
+
+  ```sql
+  CREATE DATABASE <your-database-name>
+    WITH
+    ENCODING = 'UTF8';
+  ```
+
+8. Create a .env (see [.env.sample](.env.sample)) and save your Polygon API key.
+
+9. Create a airflow_settings.yaml (see [airflow_settings.yaml.sample](airflow_settings.yaml.sample)) and save your PostgreSQL database information.
+
+10. (Optional) Modify the Airflow DAG settings (see [/dags/dags_settings.py](/dags/dags_settings.py)).
+
+11. (Optional) If port 8080 or 5432 are in use on your machine by other services, the Airflow webserver and metadata database won't be able to start. To run these components on different ports, run the following commands
+
+  ```bash
+  astro config set webserver.port <available-port>
+  astro config set postgres.port <available-port>
+  ```
+
+12. Start Apache Airflow with Astro CLI
+
+  ```bash
+  astro dev start
+  ```
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
