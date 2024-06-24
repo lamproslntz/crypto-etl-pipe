@@ -114,7 +114,7 @@ def create_dag(dag_id: str, crypto_symbol: str):
             "retry_delay": pendulum.duration(minutes=1),
             "depends_on_past": False,
         },
-        tags=["polygon", "crypto"],
+        tags=["polygon", "crypto", crypto_symbol],
     )
     def crypto_pipeline():
         """ETL pipeline for crypto data from Crypto Polygon API."""
