@@ -95,15 +95,17 @@ def load_task(postgres_conn_id: str, records: Optional[dict]) -> None:
 
 
 def create_dag(dag_id: str, crypto_symbol: str):
-    """Creates Aiflow DAGs representing ETL pipelines for crypto data from Crypto Polygon API.
+    """Factory creating Aiflow DAGs representing ETL pipelines for crypto data from Crypto Polygon API.
 
     Args:
         dag_id:
             Aiflow DAG identifier.
         crypto_symbol:
             Crypto symbol (e.g. BTC, DOGE, etc.).
+    
+    Returns: 
+        Airflow DAG.
     """
-
     @dag(
         dag_id=dag_id,
         start_date=pendulum.parse(START_DATE),
@@ -117,7 +119,7 @@ def create_dag(dag_id: str, crypto_symbol: str):
         tags=["polygon", "crypto", crypto_symbol],
     )
     def crypto_pipeline():
-        """ETL pipeline for crypto data from Crypto Polygon API."""
+        """Created Aiflow DAG representing ETL pipeline for crypto data from Crypto Polygon API."""
         begin_task = EmptyOperator(task_id="begin")
         end_task = EmptyOperator(task_id="end")
 
