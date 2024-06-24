@@ -6,9 +6,14 @@ airflow.cfg
 
 # Git / GitHub
 .git
+.pre-commit-config.yaml
 
 # Logs
 logs/
+
+# Markdown
+README.md
+LICENSE
 
 # PyCharm
 .idea/
@@ -140,7 +145,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env.sample
 .env
 .venv
 env/
